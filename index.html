@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Performance Dashboard — Colony &amp; Jerry</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  /* Password Gate */
+  .pw-overlay{position:fixed;inset:0;background:#0f1117;z-index:9999;display:flex;align-items:center;justify-content:center}
+  .pw-box{background:#222636;border:1px solid #2e3348;border-radius:16px;padding:40px;text-align:center;max-width:380px;width:90%}
+  .pw-box h2{font-size:20px;margin-bottom:8px;background:linear-gradient(135deg,#6c5ce7,#00cec9);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+  .pw-box p{color:#8b8fa3;font-size:13px;margin-bottom:20px}
+  .pw-box input{width:100%;padding:12px 16px;border-radius:8px;border:1px solid #2e3348;background:#1a1d27;color:#e4e7f1;font-size:14px;outline:none;margin-bottom:12px}
+  .pw-box input:focus{border-color:#6c5ce7}
+  .pw-box button{width:100%;padding:12px;border-radius:8px;border:none;background:linear-gradient(135deg,#6c5ce7,#00cec9);color:white;font-size:14px;font-weight:600;cursor:pointer}
+  .pw-box button:hover{opacity:.9}
+  .pw-error{color:#ff6b6b;font-size:12px;margin-top:8px;display:none}
+  .pw-hidden{display:none!important}
+
+  :root{--bg:#0f1117;--surface:#1a1d27;--card:#222636;--border:#2e3348;--text:#e4e7f1;--muted:#8b8fa3;--accent:#6c5ce7;--accent2:#00cec9;--green:#00b894;--red:#ff6b6b;--orange:#fdcb6e;--blue:#74b9ff;--purple:#a29bfe}
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);line-height:1.5}
+  .container{max-width:1400px;margin:0 auto;padding:24px}
+  .header{display:flex;justify-content:space-between;align-items:center;margin-bottom:28px;flex-wrap:wrap;gap:12px}
+  .header h1{font-size:24px;font-weight:700;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+  .header .meta{color:var(--muted);font-size:13px}
+  .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600}
+  .badge-live{background:rgba(0,184,148,.15);color:var(--green)}
+  .badge-warn{background:rgba(253,203,110,.15);color:var(--orange)}
+  .badge-danger{background:rgba(255,107,107,.15);color:var(--red)}
+  .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:28px}
+  .kpi-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px}
+  .kpi-card .label{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:6px}
+  .kpi-card .value{font-size:26px;font-weight:700}
+  .kpi-card .sub{font-size:12px;color:var(--muted);margin-top:4px}
+  .delta-up{color:var(--green)}.delta-down{color:var(--red)}
+  .section{margin-bottom:28px}
+  .section-title{font-size:16px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+  .panel{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px}
+  .memo{background:linear-gradient(135deg,rgba(108,92,231,.08),rgba(0,206,201,.08));border:1px solid rgba(108,92,231,.25);border-radius:12px;padding:24px;margin-bottom:28px}
+  .memo h2{font-size:18px;margin-bottom:12px;color:var(--accent)}
+  .memo p{color:var(--text);font-size:14px;line-height:1.7;margin-bottom:10px}
+  .memo .highlight{color:var(--accent2);font-weight:600}
+  .action-list{list-style:none}
+  .action-list li{padding:12px 16px;border-left:3px solid var(--accent);background:rgba(108,92,231,.06);margin-bottom:8px;border-radius:0 8px 8px 0;font-size:13px}
+  .action-list li.urgent{border-left-color:var(--red);background:rgba(255,107,107,.06)}
+  .action-list li.warn{border-left-color:var(--orange);background:rgba(253,203,110,.06)}
+  .action-list .priority{font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px}
+  .action-list .priority.p1{color:var(--red)}.action-list .priority.p2{color:var(--orange)}.action-list .priority.p3{color:var(--blue)}
+  .data-table{width:100%;border-collapse:collapse;font-size:13px}
+  .data-table th{text-align:left;padding:10px 12px;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border)}
+  .data-table td{padding:10px 12px;border-bottom:1px solid rgba(46,51,72,.5)}
+  .data-table tr:hover td{background:rgba(108,92,231,.04)}
+  .data-table .num{text-align:right;font-variant-numeric:tabular-nums}
+  .chart-box{position:relative;height:280px}
+  .acct-compare{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .acct-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px}
+  .acct-card h3{font-size:14px;margin-bottom:10px}
+  .acct-stat{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(46,51,72,.3);font-size:13px}
+  .acct-stat .lbl{color:var(--muted)}
+  .fatigue-item{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--surface);border-radius:8px;margin-bottom:8px;font-size:13px;flex-wrap:wrap;gap:8px}
+  .fatigue-item .name{flex:1;min-width:180px}
+  .fatigue-item .metric{text-align:right;min-width:70px}
+  .sev-HIGH{color:var(--red);font-weight:700}.sev-MEDIUM{color:var(--orange);font-weight:600}.sev-LOW{color:var(--blue)}
+  .anomaly-card{padding:12px 16px;background:var(--surface);border-radius:8px;margin-bottom:8px;border-left:3px solid var(--orange)}
+  .anomaly-card .title{font-weight:600;font-size:13px;margin-bottom:4px}
+  .anomaly-card .desc{font-size:12px;color:var(--muted)}
+  .tab-bar{display:flex;gap:8px;margin-bottom:16px}
+  .tab-btn{padding:6px 16px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-size:12px;transition:all .2s}
+  .tab-btn.active{background:var(--accent);color:white;border-color:var(--accent)}
+  .tab-content{display:none}.tab-content.active{display:block}
+  @media(max-width:900px){.acct-compare{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<!-- PASSWORD GATE -->
+<div class="pw-overlay" id="pwOverlay">
+  <div class="pw-box">
+    <h2>Performance Dashboard</h2>
+    <p>Colony &amp; Jerry &mdash; Enter password to continue</p>
+    <input type="password" id="pwInput" placeholder="Enter password" autofocus>
+    <button onclick="checkPw()">Unlock Dashboard</button>
+    <div class="pw-error" id="pwError">Incorrect password. Please try again.</div>
+  </div>
+</div>
+
+<!-- DASHBOARD (hidden until password) -->
+<div class="container pw-hidden" id="dashContent">
+
+<div class="header">
+  <div>
+    <h1>Performance Dashboard</h1>
+    <div class="meta">Colony Facebook + Jerry by Colony &middot; Last 30 Days &middot; Generated 17 Apr 2026 &middot; <span class="badge badge-live">LIVE DATA</span></div>
+  </div>
+  <div><span class="meta">Currency: MYR &middot; Timezone: Asia/Kuala_Lumpur</span></div>
+</div>
+
+<div class="kpi-grid" id="kpiGrid"></div>
+<div class="memo" id="memoSection"></div>
+
+<div class="section">
+  <div class="section-title">&#127919; Priority Actions</div>
+  <ul class="action-list" id="actionList"></ul>
+</div>
+
+<div class="section">
+  <div class="section-title">&#9889; Anomalies Detected</div>
+  <div id="anomalies"></div>
+</div>
+
+<div class="section">
+  <div class="section-title">&#128200; Daily Trends</div>
+  <div class="tab-bar" id="chartTabs">
+    <button class="tab-btn active" data-tab="spend">Spend &amp; Leads</button>
+    <button class="tab-btn" data-tab="cpl">CPL Trend</button>
+    <button class="tab-btn" data-tab="ctr">CTR Trend</button>
+  </div>
+  <div class="panel">
+    <div class="tab-content active" data-tab="spend"><div class="chart-box"><canvas id="chartSpendLeads"></canvas></div></div>
+    <div class="tab-content" data-tab="cpl"><div class="chart-box"><canvas id="chartCPL"></canvas></div></div>
+    <div class="tab-content" data-tab="ctr"><div class="chart-box"><canvas id="chartCTR"></canvas></div></div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-title">&#127970; Account Comparison</div>
+  <div class="acct-compare" id="acctCompare"></div>
+</div>
+
+<div class="section">
+  <div class="section-title">&#128202; Campaign Breakdown</div>
+  <div class="panel" style="overflow-x:auto">
+    <table class="data-table" id="campaignTable">
+      <thead><tr>
+        <th>Account</th><th>Campaign</th><th class="num">Spend (MYR)</th><th class="num">Impressions</th>
+        <th class="num">Clicks</th><th class="num">CTR %</th><th class="num">CPC</th>
+        <th class="num">Leads</th><th class="num">CPL</th><th class="num">Messages</th><th class="num">Frequency</th>
+      </tr></thead>
+      <tbody id="campaignBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-title">&#128293; Creative Fatigue Watchlist</div>
+  <div class="panel" id="fatigueList"></div>
+</div>
+
+</div><!-- end dashContent -->
+
+<script>
+// ====================
+// PASSWORD GATE
+// ====================
+function checkPw(){
+  if(document.getElementById('pwInput').value==='colony2026'){
+    document.getElementById('pwOverlay').style.display='none';
+    document.getElementById('dashContent').classList.remove('pw-hidden');
+    window.dispatchEvent(new Event('resize'));
+  }else{
+    document.getElementById('pwError').style.display='block';
+    document.getElementById('pwInput').value='';
+    document.getElementById('pwInput').focus();
+  }
+}
+document.getElementById('pwInput').addEventListener('keydown',function(e){if(e.key==='Enter')checkPw()});
+
+// ====================
+// LIVE DATA
+// ====================
+var DATA={
+  accounts:{
+    "Colony Facebook":{
+      totals:{spend:36278.27,impressions:940416,clicks:50035,reach:461006,leads:6914,messaging:1082,cpl:5.25,ctr:5.32,cpc:0.73},
+      campaigns:[
+        {id:"1",name:"OTHE_Colony_MT_BAU-PORD_LEA_240513",imp:16059,cl:8422,sp:1671.85,cpc:0.20,cpm:104.11,ctr:52.44,reach:12211,freq:1.32,leads:1476,msg:0,lc:8915,lpv:7200,cpl:1.13},
+        {id:"2",name:"OTHE_Colony_MT_BAU-Event_LEA_240513",imp:11409,cl:8832,sp:2781.21,cpc:0.31,cpm:243.77,ctr:77.41,reach:9605,freq:1.19,leads:1966,msg:0,lc:9603,lpv:7987,cpl:1.41},
+        {id:"3",name:"OTHE_Colony_MT_BAU-Wedding_LEA_240513",imp:8127,cl:6102,sp:1637.18,cpc:0.27,cpm:201.46,ctr:75.09,reach:6927,freq:1.17,leads:1277,msg:0,lc:6547,lpv:5482,cpl:1.28},
+        {id:"4",name:"OTHE_Colony_MT_BAU-Event-RMKT_LEA_250708",imp:5403,cl:291,sp:234.42,cpc:0.81,cpm:43.39,ctr:5.39,reach:3715,freq:1.45,leads:32,msg:0,lc:148,lpv:109,cpl:7.33},
+        {id:"5",name:"OTHE_Colony_MT_BAU-Wedding-RMKT_ENG_250708",imp:178997,cl:4152,sp:5233.24,cpc:1.26,cpm:29.24,ctr:2.32,reach:67770,freq:2.64,leads:0,msg:218,lc:1419,lpv:0,cpl:null},
+        {id:"6",name:"OTHE_Colony_MT_BAU-Wedding-RMKT_LEA_250708",imp:36966,cl:2047,sp:1020.03,cpc:0.50,cpm:27.59,ctr:5.54,reach:22597,freq:1.64,leads:121,msg:0,lc:1118,lpv:839,cpl:8.43},
+        {id:"7",name:"OTHE_Colony_MT_BAU-Event-RMKT_ENG_250708",imp:128483,cl:3038,sp:3814.33,cpc:1.26,cpm:29.69,ctr:2.36,reach:56723,freq:2.27,leads:0,msg:252,lc:1030,lpv:0,cpl:null},
+        {id:"8",name:"OTHE_Colony_MT_BAU-Event_LEA_250708",imp:299483,cl:10167,sp:8750.90,cpc:0.86,cpm:29.22,ctr:3.40,reach:176779,freq:1.69,leads:1273,msg:0,lc:4870,lpv:3413,cpl:6.87},
+        {id:"9",name:"OTHE_Colony_MT_BAU-Wedding_LEA_250708",imp:213765,cl:5771,sp:7919.59,cpc:1.37,cpm:37.05,ctr:2.70,reach:90397,freq:2.36,leads:769,msg:0,lc:2488,lpv:1632,cpl:10.30},
+        {id:"10",name:"OTHE_Colony_MT_BAU-Event_LEA_260415",imp:41724,cl:1213,sp:4215.52,cpc:3.47,cpm:101.03,ctr:2.91,reach:14282,freq:2.92,leads:0,msg:612,lc:430,lpv:0,cpl:null}
+      ],
+      active:10,paused:90
+    },
+    "Jerry by Colony":{
+      totals:{spend:5341.41,impressions:266275,clicks:3512,reach:154545,leads:22,messaging:241,cpl:242.79,ctr:1.32,cpc:1.52},
+      campaigns:[
+        {id:"11",name:"OTHE_Jerry_MT_DP+PP-Advantage_SAL_240219",imp:18498,cl:205,sp:108.85,cpc:0.53,cpm:5.88,ctr:1.11,reach:11119,freq:1.66,leads:3,msg:0,lc:193,lpv:121,cpl:36.28},
+        {id:"12",name:"OTHE_Jerry_MT_MP-Johor_ENG-MES_251027",imp:42542,cl:522,sp:936.98,cpc:1.79,cpm:22.02,ctr:1.23,reach:21933,freq:1.94,leads:2,msg:31,lc:199,lpv:2,cpl:468.49},
+        {id:"13",name:"OTHE_Jerry_MT_MP-BAU_ENG-MES_251027",imp:184745,cl:2370,sp:3631.70,cpc:1.53,cpm:19.66,ctr:1.28,reach:109700,freq:1.68,leads:7,msg:185,lc:781,lpv:5,cpl:518.81},
+        {id:"14",name:"OTHE_Jerry_MT_MP-BAU_LEA_251209",imp:20490,cl:415,sp:663.88,cpc:1.60,cpm:32.40,ctr:2.03,reach:11793,freq:1.74,leads:10,msg:25,lc:311,lpv:205,cpl:66.39}
+      ],
+      active:5,paused:95
+    }
+  },
+  daily:{
+    "Colony Facebook":[
+      {d:"2026-03-18",sp:1208.53,imp:23795,cl:2056,ctr:8.64,cpc:0.59,re:17723,fr:1.34,le:313,ms:30},
+      {d:"2026-03-19",sp:1390.25,imp:28542,cl:2646,ctr:9.27,cpc:0.53,re:22150,fr:1.29,le:358,ms:43},
+      {d:"2026-03-20",sp:189.76,imp:3858,cl:378,ctr:9.80,cpc:0.50,re:3433,fr:1.12,le:60,ms:8},
+      {d:"2026-03-23",sp:0,imp:0,cl:0,ctr:0,cpc:0,re:0,fr:0,le:4,ms:0},
+      {d:"2026-03-24",sp:1574.47,imp:37634,cl:2506,ctr:6.66,cpc:0.63,re:28961,fr:1.30,le:274,ms:36},
+      {d:"2026-03-25",sp:1563.63,imp:38073,cl:2552,ctr:6.70,cpc:0.61,re:29308,fr:1.30,le:286,ms:43},
+      {d:"2026-03-26",sp:1555.20,imp:37587,cl:2475,ctr:6.59,cpc:0.63,re:29068,fr:1.29,le:270,ms:37},
+      {d:"2026-03-27",sp:1550.53,imp:37397,cl:2507,ctr:6.70,cpc:0.62,re:28797,fr:1.30,le:285,ms:41},
+      {d:"2026-03-28",sp:1524.84,imp:36939,cl:2437,ctr:6.60,cpc:0.63,re:28516,fr:1.30,le:268,ms:39},
+      {d:"2026-03-29",sp:1478.58,imp:35547,cl:2263,ctr:6.37,cpc:0.65,re:27706,fr:1.28,le:253,ms:34},
+      {d:"2026-03-30",sp:1470.09,imp:34969,cl:2264,ctr:6.47,cpc:0.65,re:26959,fr:1.30,le:237,ms:36},
+      {d:"2026-03-31",sp:1545.85,imp:37153,cl:2453,ctr:6.60,cpc:0.63,re:28693,fr:1.29,le:282,ms:35},
+      {d:"2026-04-01",sp:1554.39,imp:37271,cl:2437,ctr:6.54,cpc:0.64,re:28671,fr:1.30,le:264,ms:39},
+      {d:"2026-04-02",sp:1546.33,imp:37087,cl:2389,ctr:6.44,cpc:0.65,re:28538,fr:1.30,le:272,ms:37},
+      {d:"2026-04-03",sp:1556.67,imp:37349,cl:2484,ctr:6.65,cpc:0.63,re:28757,fr:1.30,le:289,ms:40},
+      {d:"2026-04-04",sp:1535.16,imp:36922,cl:2404,ctr:6.51,cpc:0.64,re:28404,fr:1.30,le:275,ms:36},
+      {d:"2026-04-05",sp:1464.12,imp:35040,cl:2226,ctr:6.35,cpc:0.66,re:27373,fr:1.28,le:249,ms:30},
+      {d:"2026-04-06",sp:1444.75,imp:34584,cl:2227,ctr:6.44,cpc:0.65,re:26777,fr:1.29,le:241,ms:34},
+      {d:"2026-04-07",sp:1550.77,imp:37308,cl:2470,ctr:6.62,cpc:0.63,re:28691,fr:1.30,le:280,ms:40},
+      {d:"2026-04-08",sp:1475.76,imp:34856,cl:2320,ctr:6.66,cpc:0.64,re:26789,fr:1.30,le:268,ms:39},
+      {d:"2026-04-09",sp:1465.14,imp:34408,cl:2308,ctr:6.71,cpc:0.63,re:26406,fr:1.30,le:278,ms:34},
+      {d:"2026-04-10",sp:1463.76,imp:34364,cl:2273,ctr:6.61,cpc:0.64,re:26367,fr:1.30,le:263,ms:36},
+      {d:"2026-04-11",sp:1418.86,imp:33063,cl:2183,ctr:6.60,cpc:0.65,re:25537,fr:1.29,le:260,ms:37},
+      {d:"2026-04-12",sp:1345.85,imp:31452,cl:2017,ctr:6.41,cpc:0.67,re:24566,fr:1.28,le:236,ms:30},
+      {d:"2026-04-13",sp:1334.57,imp:30930,cl:2035,ctr:6.58,cpc:0.66,re:23785,fr:1.30,le:223,ms:30},
+      {d:"2026-04-14",sp:1440.52,imp:33758,cl:2273,ctr:6.73,cpc:0.63,re:26004,fr:1.30,le:279,ms:36},
+      {d:"2026-04-15",sp:1416.15,imp:33192,cl:2199,ctr:6.62,cpc:0.64,re:25676,fr:1.29,le:256,ms:31},
+      {d:"2026-04-16",sp:1095.50,imp:23960,cl:1699,ctr:7.09,cpc:0.64,re:19230,fr:1.25,le:218,ms:24},
+      {d:"2026-04-17",sp:394.19,imp:9534,cl:582,ctr:6.10,cpc:0.68,re:7099,fr:1.34,le:72,ms:7}
+    ],
+    "Jerry by Colony":[
+      {d:"2026-03-21",sp:197.47,imp:9878,cl:122,ctr:1.24,cpc:1.62,re:6083,fr:1.62,le:1,ms:9},
+      {d:"2026-03-22",sp:169.73,imp:8425,cl:84,ctr:1.00,cpc:2.02,re:5424,fr:1.55,le:0,ms:7},
+      {d:"2026-03-23",sp:192.87,imp:10225,cl:140,ctr:1.37,cpc:1.38,re:6230,fr:1.64,le:1,ms:11},
+      {d:"2026-03-24",sp:208.97,imp:10782,cl:132,ctr:1.22,cpc:1.58,re:6555,fr:1.64,le:1,ms:10},
+      {d:"2026-03-25",sp:201.33,imp:10327,cl:130,ctr:1.26,cpc:1.55,re:6282,fr:1.64,le:0,ms:7},
+      {d:"2026-03-26",sp:196.29,imp:10151,cl:116,ctr:1.14,cpc:1.69,re:6129,fr:1.66,le:1,ms:10},
+      {d:"2026-03-27",sp:202.60,imp:10325,cl:138,ctr:1.34,cpc:1.47,re:6243,fr:1.65,le:1,ms:10},
+      {d:"2026-03-28",sp:193.21,imp:9909,cl:117,ctr:1.18,cpc:1.65,re:6031,fr:1.64,le:0,ms:8},
+      {d:"2026-03-29",sp:183.32,imp:9219,cl:95,ctr:1.03,cpc:1.93,re:5791,fr:1.59,le:0,ms:7},
+      {d:"2026-03-30",sp:184.60,imp:9189,cl:104,ctr:1.13,cpc:1.78,re:5644,fr:1.63,le:0,ms:6},
+      {d:"2026-03-31",sp:199.27,imp:10276,cl:137,ctr:1.33,cpc:1.45,re:6216,fr:1.65,le:1,ms:9},
+      {d:"2026-04-01",sp:209.78,imp:10437,cl:152,ctr:1.46,cpc:1.38,re:6264,fr:1.67,le:2,ms:12},
+      {d:"2026-04-02",sp:195.30,imp:10001,cl:134,ctr:1.34,cpc:1.46,re:6059,fr:1.65,le:1,ms:8},
+      {d:"2026-04-03",sp:206.07,imp:10447,cl:148,ctr:1.42,cpc:1.39,re:6254,fr:1.67,le:2,ms:12},
+      {d:"2026-04-04",sp:199.87,imp:10197,cl:128,ctr:1.26,cpc:1.56,re:6138,fr:1.66,le:0,ms:9},
+      {d:"2026-04-05",sp:184.24,imp:9310,cl:105,ctr:1.13,cpc:1.75,re:5822,fr:1.60,le:0,ms:8},
+      {d:"2026-04-06",sp:182.99,imp:9148,cl:100,ctr:1.09,cpc:1.83,re:5677,fr:1.61,le:0,ms:7},
+      {d:"2026-04-07",sp:203.74,imp:10469,cl:137,ctr:1.31,cpc:1.49,re:6299,fr:1.66,le:1,ms:12},
+      {d:"2026-04-08",sp:202.07,imp:10243,cl:148,ctr:1.44,cpc:1.37,re:6153,fr:1.66,le:1,ms:11},
+      {d:"2026-04-09",sp:202.24,imp:10238,cl:144,ctr:1.41,cpc:1.40,re:6123,fr:1.67,le:2,ms:10},
+      {d:"2026-04-10",sp:198.34,imp:10032,cl:138,ctr:1.38,cpc:1.44,re:6031,fr:1.66,le:1,ms:9},
+      {d:"2026-04-11",sp:196.95,imp:9933,cl:134,ctr:1.35,cpc:1.47,re:5985,fr:1.66,le:1,ms:8},
+      {d:"2026-04-12",sp:179.40,imp:9018,cl:107,ctr:1.19,cpc:1.68,re:5631,fr:1.60,le:0,ms:7},
+      {d:"2026-04-13",sp:180.96,imp:9035,cl:99,ctr:1.10,cpc:1.83,re:5551,fr:1.63,le:0,ms:6},
+      {d:"2026-04-14",sp:195.58,imp:9953,cl:147,ctr:1.48,cpc:1.33,re:5962,fr:1.67,le:2,ms:10},
+      {d:"2026-04-15",sp:197.65,imp:10039,cl:152,ctr:1.51,cpc:1.30,re:6032,fr:1.66,le:2,ms:11},
+      {d:"2026-04-16",sp:137.31,imp:7599,cl:100,ctr:1.32,cpc:1.37,re:4457,fr:1.70,le:1,ms:7}
+    ]
+  },
+  fatigue:{
+    "Colony Facebook":[
+      {name:"250813_Wedding_VDO_Social-BM",campaign:"BAU-Wedding-RMKT_ENG",freq:1.19,ctrDrop:29.3,spend:1180.35,days:11,severity:"MEDIUM"},
+      {name:"260227_Event_VDO_Raya-BM",campaign:"BAU-Event_ENG",freq:1.00,ctrDrop:50.8,spend:794.87,days:11,severity:"MEDIUM"},
+      {name:"260210_Event_VDO_SetiaAlam-BAU-EN",campaign:"BAU-Event_ENG",freq:0,ctrDrop:65.8,spend:693.47,days:6,severity:"MEDIUM"},
+      {name:"250523_Event_CRS_LocationPax-EN",campaign:"BAU-Event_ENG",freq:1.47,ctrDrop:18.4,spend:390.45,days:11,severity:"LOW"},
+      {name:"260303_Wedding-RMKT_CRS_BM",campaign:"BAU-Wedding-RMKT_LEA",freq:1.20,ctrDrop:36.3,spend:272.68,days:11,severity:"MEDIUM"}
+    ],
+    "Jerry by Colony":[
+      {name:"251029_Jerry_VDO_BAU-BM",campaign:"MP-BAU_ENG-MES",freq:1.57,ctrDrop:23.0,spend:1034.48,days:11,severity:"MEDIUM"},
+      {name:"251029_Jerry_VDO_BAU-EN",campaign:"MP-BAU_ENG-MES",freq:1.51,ctrDrop:23.2,spend:713.81,days:11,severity:"MEDIUM"},
+      {name:"251029_Jerry_CRS_BAU-BM",campaign:"MP-BAU_ENG-MES",freq:1.82,ctrDrop:18.3,spend:571.46,days:11,severity:"LOW"},
+      {name:"260113_Jerry_VDO_BAU-EN",campaign:"MP-BAU_ENG-MES",freq:1.50,ctrDrop:46.3,spend:368.72,days:11,severity:"MEDIUM"}
+    ]
+  }
+};
+
+// ====================
+// ANALYSIS ENGINE
+// ====================
+function runAnalysis(data){
+  var col=data.accounts["Colony Facebook"],jer=data.accounts["Jerry by Colony"];
+  var combined={
+    spend:col.totals.spend+jer.totals.spend,leads:col.totals.leads+jer.totals.leads,
+    messaging:col.totals.messaging+jer.totals.messaging,impressions:col.totals.impressions+jer.totals.impressions,
+    clicks:col.totals.clicks+jer.totals.clicks,reach:col.totals.reach+jer.totals.reach
+  };
+  combined.cpl=combined.leads>0?combined.spend/combined.leads:0;
+  combined.ctr=combined.impressions>0?(combined.clicks/combined.impressions*100):0;
+  combined.cpc=combined.clicks>0?combined.spend/combined.clicks:0;
+
+  var colDaily=data.daily["Colony Facebook"];
+  var lastWeek=colDaily.slice(-7),prevWeek=colDaily.slice(-14,-7);
+  var lwLeads=lastWeek.reduce(function(s,d){return s+d.le},0);
+  var pwLeads=prevWeek.reduce(function(s,d){return s+d.le},0);
+  var leadsDelta=pwLeads>0?((lwLeads-pwLeads)/pwLeads*100):0;
+
+  var anomalies=[];
+  if(jer.totals.cpl>100){
+    anomalies.push({title:"Jerry by Colony: Extremely high CPL (MYR "+jer.totals.cpl.toFixed(2)+")",desc:"Lead gen campaigns underperforming. Messaging (241 conversations) is the primary conversion driver. Consider redefining success metrics."});
+  }
+  col.campaigns.forEach(function(c){
+    if(c.freq>2.5){anomalies.push({title:c.name.split('_').slice(3,6).join(' ')+": High frequency ("+c.freq.toFixed(1)+")",desc:"Audience saturation risk. Frequency above 2.5x. Consider expanding targeting or rotating creatives.");}
+  });
+  var totalFatigued=(data.fatigue["Colony Facebook"]||[]).length+(data.fatigue["Jerry by Colony"]||[]).length;
+  if(totalFatigued>5){anomalies.push({title:totalFatigued+" creatives showing fatigue signals",desc:"Multiple ads have declining CTR (>15% drop). Schedule creative refreshes for the worst performers."});}
+
+  var colTopSpender=col.campaigns.slice().sort(function(a,b){return b.sp-a.sp})[0];
+  var colSpendConc=colTopSpender?(colTopSpender.sp/col.totals.spend*100):0;
+
+  return{combined:combined,col:col,jer:jer,leadsDelta:leadsDelta,anomalies:anomalies,colSpendConc:colSpendConc,colTopSpender:colTopSpender,totalFatigued:totalFatigued};
+}
+
+// ====================
+// RENDERERS
+// ====================
+function renderKPIs(a){
+  var c=a.combined;
+  var kpis=[
+    {label:"Total Spend",value:"MYR "+c.spend.toLocaleString('en',{maximumFractionDigits:0}),sub:"30-day period"},
+    {label:"Total Leads",value:c.leads.toLocaleString(),sub:"Form submissions",delta:a.leadsDelta},
+    {label:"Avg CPL",value:"MYR "+c.cpl.toFixed(2),sub:"Combined accounts"},
+    {label:"Messages",value:c.messaging.toLocaleString(),sub:"Conversations started"},
+    {label:"Impressions",value:(c.impressions/1000).toFixed(0)+"K",sub:"Reach: "+(c.reach/1000).toFixed(0)+"K"},
+    {label:"Avg CTR",value:c.ctr.toFixed(2)+"%",sub:"Blended across accounts"},
+    {label:"Avg CPC",value:"MYR "+c.cpc.toFixed(2),sub:"Cost per click"},
+    {label:"Active Campaigns",value:(a.col.active+a.jer.active),sub:"Colony: "+a.col.active+" / Jerry: "+a.jer.active}
+  ];
+  document.getElementById('kpiGrid').innerHTML=kpis.map(function(k){
+    var deltaHtml='';
+    if(k.delta!==undefined){deltaHtml='<div class="'+(k.delta>=0?'delta-up':'delta-down')+'" style="font-size:12px;font-weight:600">'+(k.delta>=0?'&#9650;':'&#9660;')+' '+Math.abs(k.delta).toFixed(1)+'% WoW<\/div>';}
+    return '<div class="kpi-card"><div class="label">'+k.label+'<\/div><div class="value">'+k.value+'<\/div>'+deltaHtml+'<div class="sub">'+k.sub+'<\/div><\/div>';
+  }).join('');
+}
+
+function renderMemo(a){
+  var col=a.col.totals,jer=a.jer.totals,c=a.combined;
+  var weddingFreq='2.6';
+  a.col.campaigns.forEach(function(x){if(x.name.indexOf('Wedding-RMKT_ENG')>-1)weddingFreq=x.freq.toFixed(1);});
+  document.getElementById('memoSection').innerHTML=
+    '<h2>Senior Marketer Analysis Memo<\/h2>'+
+    '<p><strong>Executive Summary:<\/strong> Over the past 30 days, the two accounts spent a combined <span class="highlight">MYR '+c.spend.toLocaleString('en',{maximumFractionDigits:0})+'<\/span> generating <span class="highlight">'+c.leads.toLocaleString()+' leads<\/span> and <span class="highlight">'+c.messaging.toLocaleString()+' messaging conversations<\/span>. Colony Facebook dominates with a healthy CPL of <span class="highlight">MYR '+col.cpl.toFixed(2)+'<\/span>, while Jerry by Colony needs structural attention (CPL: MYR '+jer.cpl.toFixed(2)+').<\/p>'+
+    '<p><strong>Colony Facebook<\/strong> is performing well. The BAU lead campaigns from May 2024 are workhorses with extremely low CPLs (MYR 1.13\u20131.41). Newer July 2025 campaigns run at higher CPLs (MYR 6.87\u201310.30) but with broader reach. Engagement/remarketing campaigns drive '+col.messaging+' messaging conversations. Key concern: frequency on Wedding-RMKT_ENG has hit '+weddingFreq+'x \u2014 audience saturation is approaching.<\/p>'+
+    '<p><strong>Jerry by Colony<\/strong> is a messaging-driven account \u2014 only 22 form leads vs. 241 messaging conversations. Cost-per-messaging-conversation (MYR '+(jer.spend/jer.messaging).toFixed(2)+') is a more meaningful KPI and is reasonable for coworking space inquiries.<\/p>'+
+    '<p><strong>Creative Fatigue:<\/strong> '+a.totalFatigued+' creatives showing fatigue signals. Worst: Raya video (CTR dropped 50.8%) and SetiaAlam video (CTR dropped 65.8%). These need immediate creative rotation.<\/p>'+
+    '<p><strong>Budget Allocation:<\/strong> Colony\'s top campaign absorbs '+a.colSpendConc.toFixed(0)+'% of budget. Consider testing redistribution to the lower-CPL legacy campaigns if lead quality is comparable.<\/p>';
+}
+
+function renderActions(a){
+  var jer=a.jer.totals;
+  var weddingFreq='2.6';
+  a.col.campaigns.forEach(function(x){if(x.name.indexOf('Wedding-RMKT_ENG')>-1)weddingFreq=x.freq.toFixed(1);});
+  var actions=[
+    {p:"P1",cls:"urgent",pCls:"p1",text:"Rotate creatives on Colony Event_ENG campaign immediately \u2014 2 videos show 50\u201365% CTR decline. Replace with fresh content."},
+    {p:"P1",cls:"urgent",pCls:"p1",text:"Redefine Jerry KPIs \u2014 switch primary metric from CPL to Cost-per-Messaging-Conversation (currently MYR "+(jer.spend/jer.messaging).toFixed(2)+")."},
+    {p:"P2",cls:"warn",pCls:"p2",text:"Address frequency saturation on Colony Wedding-RMKT_ENG (freq: "+weddingFreq+"x). Expand lookalike audiences or add new interest segments."},
+    {p:"P2",cls:"warn",pCls:"p2",text:"Test budget reallocation: shift 10\u201315% from Colony\u2019s newer high-CPL campaigns (MYR 6.87\u201310.30) to legacy campaigns (CPL MYR 1.13\u20131.41)."},
+    {p:"P3",cls:"",pCls:"p3",text:"Set up offline conversion tracking for Colony to measure MQL/SQL rates. Current lead volume (6,914) is high \u2014 quality scoring will unlock next-level optimization."},
+    {p:"P3",cls:"",pCls:"p3",text:"For Jerry, A/B test a dedicated lead-form campaign with a strong offer (free day pass, tour booking) alongside the messaging approach."}
+  ];
+  document.getElementById('actionList').innerHTML=actions.map(function(a){
+    return '<li class="'+a.cls+'"><div class="priority '+a.pCls+'">'+a.p+' \u2014 '+(a.p==='P1'?'Immediate':a.p==='P2'?'This Week':'Strategic')+'<\/div>'+a.text+'<\/li>';
+  }).join('');
+}
+
+function renderAnomalies(a){
+  document.getElementById('anomalies').innerHTML=a.anomalies.slice(0,6).map(function(x){
+    return '<div class="anomaly-card"><div class="title">'+x.title+'<\/div><div class="desc">'+x.desc+'<\/div><\/div>';
+  }).join('');
+}
+
+function renderCharts(data){
+  var colDaily=data.daily["Colony Facebook"],jerDaily=data.daily["Jerry by Colony"];
+  var dateSet={};
+  colDaily.forEach(function(d){dateSet[d.d]=true});
+  jerDaily.forEach(function(d){dateSet[d.d]=true});
+  var allDates=Object.keys(dateSet).sort();
+  var colMap={},jerMap={};
+  colDaily.forEach(function(d){colMap[d.d]=d});
+  jerDaily.forEach(function(d){jerMap[d.d]=d});
+  var labels=allDates.map(function(d){return d.substring(5)});
+
+  var scales={x:{ticks:{color:'#8b8fa3',font:{size:10},maxRotation:45},grid:{color:'rgba(46,51,72,.3)'}},y:{ticks:{color:'#8b8fa3'},grid:{color:'rgba(46,51,72,.3)'}}};
+  var legend={labels:{color:'#8b8fa3',font:{size:11}}};
+
+  new Chart(document.getElementById('chartSpendLeads'),{
+    type:'bar',
+    data:{labels:labels,datasets:[
+      {label:'Colony Spend (MYR)',data:allDates.map(function(d){return colMap[d]?colMap[d].sp:0}),backgroundColor:'rgba(108,92,231,.6)',borderRadius:3,yAxisID:'y',order:2},
+      {label:'Jerry Spend (MYR)',data:allDates.map(function(d){return jerMap[d]?jerMap[d].sp:0}),backgroundColor:'rgba(0,206,201,.6)',borderRadius:3,yAxisID:'y',order:2},
+      {label:'Colony Leads',data:allDates.map(function(d){return colMap[d]?colMap[d].le:0}),type:'line',borderColor:'#fdcb6e',backgroundColor:'transparent',borderWidth:2,pointRadius:2,yAxisID:'y1',order:1}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:legend.labels}},scales:{x:scales.x,y:scales.y,y1:{position:'right',ticks:{color:'#fdcb6e'},grid:{display:false}}}}
+  });
+
+  new Chart(document.getElementById('chartCPL'),{
+    type:'line',
+    data:{labels:labels,datasets:[
+      {label:'Colony CPL',data:allDates.map(function(d){var r=colMap[d];return r&&r.le>0?+(r.sp/r.le).toFixed(2):null}),borderColor:'#6c5ce7',borderWidth:2,pointRadius:3,tension:.3},
+      {label:'Jerry CPL',data:allDates.map(function(d){var r=jerMap[d];return r&&r.le>0?+(r.sp/r.le).toFixed(2):null}),borderColor:'#00cec9',borderWidth:2,pointRadius:3,tension:.3}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:legend.labels}},scales:scales,spanGaps:true}
+  });
+
+  new Chart(document.getElementById('chartCTR'),{
+    type:'line',
+    data:{labels:labels,datasets:[
+      {label:'Colony CTR %',data:allDates.map(function(d){return colMap[d]?colMap[d].ctr:null}),borderColor:'#6c5ce7',borderWidth:2,pointRadius:2,fill:{target:'origin',above:'rgba(108,92,231,.1)'},tension:.3},
+      {label:'Jerry CTR %',data:allDates.map(function(d){return jerMap[d]?jerMap[d].ctr:null}),borderColor:'#00cec9',borderWidth:2,pointRadius:2,fill:{target:'origin',above:'rgba(0,206,201,.1)'},tension:.3}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:legend.labels}},scales:scales,spanGaps:true}
+  });
+}
+
+function renderAccountComparison(a){
+  var col=a.col.totals,jer=a.jer.totals;
+  function card(name,color,t,extra){
+    return '<div class="acct-card"><h3 style="color:'+color+'">'+name+'<\/h3>'+
+      '<div class="acct-stat"><span class="lbl">Spend<\/span><span>MYR '+t.spend.toLocaleString('en',{maximumFractionDigits:0})+'<\/span><\/div>'+
+      '<div class="acct-stat"><span class="lbl">Leads<\/span><span>'+t.leads.toLocaleString()+'<\/span><\/div>'+
+      '<div class="acct-stat"><span class="lbl">CPL<\/span><span>MYR '+t.cpl.toFixed(2)+'<\/span><\/div>'+
+      '<div class="acct-stat"><span class="lbl">Messages<\/span><span>'+t.messaging.toLocaleString()+'<\/span><\/div>'+
+      '<div class="acct-stat"><span class="lbl">CTR<\/span><span>'+t.ctr.toFixed(2)+'%<\/span><\/div>'+
+      '<div class="acct-stat"><span class="lbl">CPC<\/span><span>MYR '+t.cpc.toFixed(2)+'<\/span><\/div>'+
+      '<div class="acct-stat"><span class="lbl">Reach<\/span><span>'+(t.reach/1000).toFixed(0)+'K<\/span><\/div>'+
+      extra+'<\/div>';
+  }
+  document.getElementById('acctCompare').innerHTML=
+    card('Colony Facebook','var(--accent)',col,'<div class="acct-stat"><span class="lbl">Active / Paused<\/span><span>'+a.col.active+' / '+a.col.paused+'<\/span><\/div>')+
+    card('Jerry by Colony','var(--accent2)',jer,'<div class="acct-stat"><span class="lbl">Cost/Message<\/span><span>MYR '+(jer.spend/jer.messaging).toFixed(2)+'<\/span><\/div>');
+}
+
+function renderCampaignTable(data){
+  var rows=[];
+  Object.keys(data.accounts).forEach(function(acct){
+    data.accounts[acct].campaigns.forEach(function(c){
+      rows.push({acct:acct==="Colony Facebook"?"Colony":"Jerry",name:c.name,sp:c.sp,imp:c.imp,cl:c.cl,ctr:c.ctr,cpc:c.cpc,leads:c.leads,cpl:c.cpl,msg:c.msg,freq:c.freq});
+    });
+  });
+  rows.sort(function(a,b){return b.sp-a.sp});
+  document.getElementById('campaignBody').innerHTML=rows.map(function(r){
+    return '<tr>'+
+      '<td><span class="badge '+(r.acct==='Colony'?'badge-live':'badge-warn')+'">'+r.acct+'<\/span><\/td>'+
+      '<td title="'+r.name+'">'+(r.name.length>45?r.name.substring(0,42)+'...':r.name)+'<\/td>'+
+      '<td class="num">'+r.sp.toLocaleString('en',{maximumFractionDigits:0})+'<\/td>'+
+      '<td class="num">'+(r.imp/1000).toFixed(1)+'K<\/td>'+
+      '<td class="num">'+r.cl.toLocaleString()+'<\/td>'+
+      '<td class="num">'+r.ctr.toFixed(1)+'%<\/td>'+
+      '<td class="num">'+r.cpc.toFixed(2)+'<\/td>'+
+      '<td class="num">'+(r.leads>0?r.leads.toLocaleString():'\u2014')+'<\/td>'+
+      '<td class="num">'+(r.cpl!==null?r.cpl.toFixed(2):'\u2014')+'<\/td>'+
+      '<td class="num">'+(r.msg>0?r.msg:'\u2014')+'<\/td>'+
+      '<td class="num'+(r.freq>2.5?' delta-down':'')+'">'+r.freq.toFixed(1)+'x<\/td><\/tr>';
+  }).join('');
+}
+
+function renderFatigue(data){
+  var all=[];
+  Object.keys(data.fatigue).forEach(function(acct){
+    data.fatigue[acct].forEach(function(f){all.push({acct:acct==="Colony Facebook"?"Colony":"Jerry",name:f.name,campaign:f.campaign,freq:f.freq,ctrDrop:f.ctrDrop,spend:f.spend,days:f.days,severity:f.severity});});
+  });
+  all.sort(function(a,b){return b.spend-a.spend});
+  document.getElementById('fatigueList').innerHTML=all.map(function(f){
+    return '<div class="fatigue-item">'+
+      '<div><span class="badge '+(f.acct==='Colony'?'badge-live':'badge-warn')+'" style="margin-right:8px">'+f.acct+'<\/span>'+
+      '<span class="name">'+f.name+'<\/span><div style="font-size:11px;color:var(--muted);margin-top:2px">'+f.campaign+'<\/div><\/div>'+
+      '<div class="metric"><div class="sev-'+f.severity+'">'+f.severity+'<\/div><div style="font-size:11px;color:var(--muted)">CTR -'+f.ctrDrop+'%<\/div><\/div>'+
+      '<div class="metric"><div>Freq: '+f.freq+'x<\/div><div style="font-size:11px;color:var(--muted)">'+f.days+'d active<\/div><\/div>'+
+      '<div class="metric"><div>MYR '+f.spend.toLocaleString('en',{maximumFractionDigits:0})+'<\/div><div style="font-size:11px;color:var(--muted)">14d spend<\/div><\/div><\/div>';
+  }).join('');
+}
+
+// ====================
+// TAB SWITCHING
+// ====================
+document.getElementById('chartTabs').addEventListener('click',function(e){
+  if(!e.target.classList.contains('tab-btn'))return;
+  document.querySelectorAll('.tab-btn').forEach(function(b){b.classList.remove('active')});
+  document.querySelectorAll('.tab-content').forEach(function(c){c.classList.remove('active')});
+  e.target.classList.add('active');
+  document.querySelector('.tab-content[data-tab="'+e.target.dataset.tab+'"]').classList.add('active');
+});
+
+// ====================
+// INIT
+// ====================
+var analysis=runAnalysis(DATA);
+renderKPIs(analysis);
+renderMemo(analysis);
+renderActions(analysis);
+renderAnomalies(analysis);
+renderCharts(DATA);
+renderAccountComparison(analysis);
+renderCampaignTable(DATA);
+renderFatigue(DATA);
+</script>
+</body>
+</html>
