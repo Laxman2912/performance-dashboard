@@ -81,7 +81,7 @@
     <h2>Performance Dashboard</h2>
     <p>Colony &amp; Jerry &mdash; Enter password to continue</p>
     <input type="password" id="pwInput" placeholder="Enter password" autofocus>
-    <button onclick="checkPw()">Unlock Dashboard</button>
+    <button id="pwBtn">Unlock Dashboard</button>
     <div class="pw-error" id="pwError">Incorrect password. Please try again.</div>
   </div>
 </div>
@@ -165,7 +165,8 @@ function checkPw(){
     document.getElementById('pwInput').focus();
   }
 }
-document.getElementById('pwInput').addEventListener('keydown',function(e){if(e.key==='Enter')checkPw()});
+document.getElementById('pwBtn').addEventListener('click',checkPw);
+document.getElementById('pwInput').addEventListener('keydown',function(e){if(e.key==='Enter')checkPw();});
 
 // ====================
 // LIVE DATA
