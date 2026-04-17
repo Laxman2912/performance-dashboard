@@ -487,7 +487,9 @@ document.getElementById('chartTabs').addEventListener('click',function(e){
 
 // ====================
 // INIT
-// ====================
+// ====================h
+  document.getElementById('pwBtn').addEventListener('click',checkPw);
+  document.getElementById('pwInput').addEventListener('keydown',function(e){if(e.key==='Enter')checkPw();});
 var analysis=runAnalysis(DATA);
 renderKPIs(analysis);
 renderMemo(analysis);
